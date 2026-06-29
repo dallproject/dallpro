@@ -41,6 +41,10 @@
   .gwhy{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
   .gchip{font-size:11px;font-weight:600;padding:4px 9px;border-radius:999px;background:var(--card2);color:var(--sec)}
   .gmsg{font-size:13px;line-height:1.6;color:var(--sec);background:#1b1d24;border-radius:11px;padding:11px 12px}
+  .bset{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin:2px 0 10px}
+  .bset input{width:80px;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--card2);color:var(--txt);font:inherit;font-size:12px}
+  .mk.hero{border:1px solid #f0445255;background:#241a1d}
+  .myw{font-size:9px;background:#f0445222;color:#f04452;padding:1px 5px;border-radius:4px;font-weight:700;margin-left:4px}
   /* 섹션 라벨 */
   .lab{font-size:13px;font-weight:700;color:var(--sec);margin:18px 2px 9px;letter-spacing:-.2px;display:flex;align-items:center;gap:8px}
   .lab .hint{font-size:11px;color:var(--dim);font-weight:500}
@@ -96,7 +100,7 @@
 <body>
 <div class="app">
   <div class="topbar">
-    <span class="wm"><i>●</i>매수 시그널</span>
+    <span class="wm"><i>●</i>매수 시그널 <span style="font-size:10px;color:#5e6573;font-weight:600;letter-spacing:0">v3 맞춤</span></span>
     <span class="dt num" id="updTop"></span>
   </div>
   <div class="body">
@@ -144,8 +148,8 @@ function spark(arr,up){if(!arr||arr.length<2)return"";const W=100,H=24,mn=Math.m
   const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
   const area=d+` L ${pts[pts.length-1][0].toFixed(1)} ${H} L ${pts[0][0].toFixed(1)} ${H} Z`;const c=up?RED:BLUE,l=pts[pts.length-1];
   return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><path d="${area}" fill="${c}" fill-opacity="0.12"/><path d="${d}" fill="none" stroke="${c}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${l[0].toFixed(1)}" cy="${l[1].toFixed(1)}" r="2.3" fill="${c}"/></svg>`;}
-function marketCard(c){const m=MARKET[c];if(!m)return"";const up=m.ok&&m.have,col=up?RED:BLUE,a2=(m.above200*100||0);
-  return `<div class="mk"><div class="top"><span class="nm">${CFLAG[c]}</span><span class="rg" style="color:${col};background:${col}22">${m.have?(up?'상승':'약세'):'-'}</span></div>
+function marketCard(c){const m=MARKET[c];if(!m)return"";const up=m.ok&&m.have,col=up?RED:BLUE,a2=(m.above200*100||0),hero=c==="us";
+  return `<div class="mk${hero?' hero':''}"><div class="top"><span class="nm">${CFLAG[c]}${hero?'<span class="myw">핵심 80%</span>':''}</span><span class="rg" style="color:${col};background:${col}22">${m.have?(up?'상승':'약세'):'-'}</span></div>
     <div class="big num">${a2.toFixed(0)}<small>% 200▲</small></div>${spark(m.spark,up)}
     <div class="sub num">신고 ${m.newHigh||0}·신저 ${m.newLow||0}</div></div>`;}
 
@@ -170,30 +174,44 @@ function buildCands(){let cands=[];
   cands.sort((x,y)=>SORT==="rs"?y.rs-x.rs:SORT==="win"?y.win-x.win:SORT==="payoff"?y.payoff-x.payoff:y.ev-x.ev);return cands;}
 
 function guideCard(){
-  const cs=["us","kr","jp"].map(c=>MARKET[c]).filter(m=>m&&m.have);
-  const nM=cs.length||1, up=cs.filter(m=>m.ok).length;
-  const avgB=cs.reduce((s,m)=>s+(m.above200||0),0)/nM;
+  const mScore=k=>{const x=MARKET[k];if(!x||!x.have)return null;return (x.ok?55:0)+(x.above200||0)*45;};
+  const us=mScore("us"),kr=mScore("kr"),jp=mScore("jp");
   const setups=TREND.filter(a=>(a.sigs||[]).some(s=>s.status==="in")).length;
-  const score=Math.round(up/3*50 + Math.min(avgB,1)*30 + Math.min(setups/30,1)*20);
-  const invest=Math.max(0,Math.min(100,Math.round(score/5)*5)), cash=100-invest;
+  let score=Math.round(0.8*(us||0)+0.1*(kr||0)+0.1*(jp||0));
+  if(setups<5)score=Math.min(score,30);
+  const invest=Math.max(0,Math.min(100,Math.round(score/5)*5)),cash=100-invest;
+  const usUp=MARKET.us&&MARKET.us.have&&MARKET.us.ok;
   let label,icon,iconbg,msg;
   if(score>=66){label="투자하기 좋은 구간";icon="📈";iconbg="#f0445222";
-    msg=`추세가 살아있는 구간입니다. 강한 종목 위주로 접근 가능합니다.`;}
+    msg=`미국이 추세 위에 있습니다(내 비중 80%). 강한 종목 위주로 핵심 자금을 천천히 분할 매수하기 좋은 구간이에요.`;}
   else if(score>=33){label="선별 투자 구간";icon="⚖️";iconbg="#d3a24a22";
-    msg=`일부 시장만 추세가 살아있습니다. 무리하지 말고 선별적으로만 접근하세요.`;}
+    msg=`미국 추세가 약하거나 애매합니다. 핵심은 아끼고, 정말 강한 자리만 소량 선별하세요.`;}
   else{label="쉬어가는 구간";icon="🌙";iconbg="#3182f622";
-    msg=`추세추종이 잘 듣지 않는 구간입니다. 현금 비중을 높이고 관망하는 편이 통계적으로 유리합니다. 좋은 자리가 생기면 아래 목록이 다시 채워집니다.`;}
-  const why=[`상승장 ${up}/${nM}`,`시장폭 ${Math.round(avgB*100)}%`,`매수자리 ${setups}개`];
+    msg=`미국이 약세라(내 비중 80%) 핵심 자금은 쉬는 편이 통계적으로 유리합니다. 횡보·약세장의 무리한 매수는 평균 손실이 큽니다. 현금은 다음 기회의 실탄이고(이자도 받습니다), 좋은 자리는 사라지지 않아요 — 강세로 돌아서면 아래 목록이 다시 채워집니다. <b>뒤처지는 게 아니라 손실을 피하는 중</b>이에요.`;}
+  const why=[`미국 ${usUp?'상승':'약세'}`,`매수자리 ${setups}개`,`현금 ${cash}% 대기·이자`];
   return `<div class="guide"><div class="ghead"><div class="gic" style="background:${iconbg}">${icon}</div>
-    <div><div class="gst">${label}</div><div class="gsub">전략 가이드 · 참고용</div></div></div>
+    <div><div class="gst">${label}</div><div class="gsub">미국 우선 가이드 · 참고용</div></div></div>
     <div class="gbar"><div style="width:${invest}%;background:#f04452">투자 ${invest}%</div><div style="width:${cash}%;background:#2b4d8a">현금 ${cash}%</div></div>
     <div class="gwhy">${why.map(w=>`<span class="gchip">${w}</span>`).join("")}</div>
     <div class="gmsg">${msg}</div></div>`;
 }
+function getSet(){return {pct:Number(localStorage.getItem('tf_explorePct')||15),cap:localStorage.getItem('tf_capital')||""};}
+function bucketsCard(){
+  const {pct,cap}=getSet(),corePct=100-pct,capN=Number(String(cap).replace(/[^0-9.]/g,''));
+  const won=v=>'약 '+Math.round(v).toLocaleString()+'만원';
+  const coreT=capN?won(capN*corePct/100):corePct+'%', expT=capN?won(capN*pct/100):pct+'%';
+  return `<div class="guide"><div class="ghead"><div class="gic" style="background:#3182f622">🧰</div>
+    <div><div class="gst">두 주머니</div><div class="gsub">핵심은 규칙대로 · 탐색은 한도 내 자유</div></div></div>
+    <div class="gbar"><div style="width:${corePct}%;background:#2b4d8a">핵심 ${corePct}%</div><div style="width:${pct}%;background:#f04452">탐색 ${pct}%</div></div>
+    <div class="gwhy"><span class="gchip">핵심 ${coreT} · 가이드 따라 분할</span><span class="gchip">탐색 ${expT} · 충동은 여기서</span></div>
+    <div class="bset"><span>탐색 비중</span><input id="bExp" type="number" min="0" max="50" value="${pct}"><span>%</span>
+      <span style="margin-left:8px">총자본(만원·선택)</span><input id="bCap" type="number" value="${cap}" placeholder="예: 10000"></div>
+    <div class="gmsg">충동이 일면 핵심이 아니라 <b>탐색 주머니</b>에서 푸세요. 한도(${pct}%)까지는 자유, 그 너머는 당신 선택이에요(막지 않습니다). 핵심은 가이드가 ‘투자 구간’일 때만 천천히 들어갑니다.</div></div>`;
+}
 function renderTrend(){
   $("#bannerTxt").textContent=`기준일 ${SIGNDATE} · 위: 가이드 → 시장 → 섹터 → 강한 종목`;
   const cands=buildCands();
-  let h=guideCard()+`<div class="mkts">${["us","kr","jp"].map(marketCard).join("")}</div>`;
+  let h=guideCard()+bucketsCard()+`<div class="mkts">${["us","kr","jp"].map(marketCard).join("")}</div>`;
   h+=`<div class="lab">섹터 강도 <span class="hint">탭하면 그 섹터만</span></div>`+sectorChipsHTML();
   h+=`<div class="lab">가장 강한 종목 <span class="hint">매수 자리 잡힌 강세주</span></div>`;
   h+=`<div class="filters">
@@ -223,6 +241,8 @@ function renderTrend(){
     h+=`</tbody></table></div>`;
   }
   $("#view").innerHTML=h;
+  const bE=$("#bExp");if(bE)bE.addEventListener("change",e=>{localStorage.setItem('tf_explorePct',Math.max(0,Math.min(50,Number(e.target.value)||0)));renderTrend();});
+  const bC=$("#bCap");if(bC)bC.addEventListener("change",e=>{localStorage.setItem('tf_capital',e.target.value.replace(/[^0-9.]/g,''));renderTrend();});
   $("#view").querySelectorAll(".schip").forEach(c=>c.addEventListener("click",()=>{F.sector=c.dataset.s;renderTrend();}));
   $("#view").querySelectorAll(".pill").forEach(p=>p.addEventListener("click",()=>{F[p.dataset.g]=p.dataset.v;renderTrend();}));
   const ss=$("#sortSel");if(ss)ss.addEventListener("change",e=>{SORT=e.target.value;renderTrend();});
