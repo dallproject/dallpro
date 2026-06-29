@@ -54,16 +54,29 @@ const USX = {
  "pdd.us":["PDD","경기소비재"],"meli.us":["MercadoLibre","경기소비재"],"nu.us":["Nubank","금융"],
  "shop.us":["Shopify","IT"],"baba.us":["Alibaba","경기소비재"],"mstr.us":["MicroStrategy","IT"]
 };
+//============ 일본 주요주(.jp, 섹터 포함) ============
+const JP = {
+ "7203.jp":["Toyota","자동차"],"7267.jp":["Honda","자동차"],"7201.jp":["Nissan","자동차"],"7269.jp":["Suzuki","자동차"],"7270.jp":["Subaru","자동차"],"6902.jp":["Denso","자동차"],"5108.jp":["Bridgestone","자동차"],
+ "6758.jp":["Sony","IT"],"6861.jp":["Keyence","IT"],"6981.jp":["Murata","IT"],"6594.jp":["Nidec","IT"],"7741.jp":["Hoya","IT"],
+ "8035.jp":["TokyoElectron","반도체"],"6857.jp":["Advantest","반도체"],"6920.jp":["Lasertec","반도체"],"6723.jp":["Renesas","반도체"],"6146.jp":["Disco","반도체"],
+ "8306.jp":["MitsubishiUFJ","금융"],"8316.jp":["SumitomoMitsui","금융"],"8411.jp":["Mizuho","금융"],"8766.jp":["TokioMarine","금융"],
+ "8058.jp":["Mitsubishi상사","상사"],"8001.jp":["Itochu","상사"],"8031.jp":["Mitsui","상사"],"8053.jp":["Sumitomo상사","상사"],"8002.jp":["Marubeni","상사"],
+ "7011.jp":["MitsubishiHeavy","산업재"],"7013.jp":["IHI","산업재"],"7012.jp":["KawasakiHeavy","산업재"],"6301.jp":["Komatsu","산업재"],"6367.jp":["Daikin","산업재"],"6954.jp":["Fanuc","산업재"],"6501.jp":["Hitachi","산업재"],"9020.jp":["JR동일본","산업재"],
+ "4502.jp":["Takeda","헬스케어"],"4568.jp":["DaiichiSankyo","헬스케어"],"4503.jp":["Astellas","헬스케어"],"4523.jp":["Eisai","헬스케어"],"4901.jp":["Fujifilm","헬스케어"],
+ "9983.jp":["FastRetailing","소비재"],"4661.jp":["OrientalLand","소비재"],"3382.jp":["Seven&i","소비재"],
+ "7974.jp":["Nintendo","커뮤니케이션"],"9984.jp":["SoftBankG","커뮤니케이션"],"9433.jp":["KDDI","커뮤니케이션"],"9432.jp":["NTT","커뮤니케이션"],"6098.jp":["Recruit","커뮤니케이션"],
+ "4063.jp":["ShinEtsu","소재"]
+};
 
-const META_KR = s => KR[s] ? [KR[s][0],KR[s][1],"stock"] : null;
-const countryOf = s => s.endsWith(".kr") ? "kr" : "us";
+const countryOf = s => s.endsWith(".kr") ? "kr" : s.endsWith(".jp") ? "jp" : "us";
 
 //============ 데이터 수집 ============
 const UA = { "User-Agent":"Mozilla/5.0 (compatible; signalbot/1.0)" };
 function toYahoo(sym){
-  if(sym.startsWith("^")) return ({ "^kospi":"%5EKS11","^spx":"%5EGSPC" })[sym]||null;
+  if(sym.startsWith("^")) return ({ "^kospi":"%5EKS11","^spx":"%5EGSPC","^nkx":"%5EN225" })[sym]||null;
   if(sym.endsWith(".kr")) return sym.replace(".kr","")+".KS";
-  if(sym.endsWith(".us")) return sym.replace(".us","").toUpperCase().replace(/-/g,"-");
+  if(sym.endsWith(".jp")) return sym.replace(".jp","")+".T";
+  if(sym.endsWith(".us")) return sym.replace(".us","").toUpperCase();
   return sym;
 }
 async function getText(url){
@@ -214,36 +227,42 @@ const SELFTEST = process.argv.includes("--selftest");
 // 1) 유니버스 구성
 let UNIV = {}; // sym -> [name, sector, asset]
 for(const s in KR) UNIV[s]=[KR[s][0],KR[s][1],"stock"];
+for(const s in JP) UNIV[s]=[JP[s][0],JP[s][1],"stock"];
 for(const s in USX) UNIV[s]=USX[s].length===3?USX[s]:[USX[s][0],USX[s][1],"stock"];
 if(!SELFTEST){ const sp=await loadSP500(); for(const s in sp) UNIV[s]=sp[s]; }
 const syms = Object.keys(UNIV);
-console.log(`유니버스: ${syms.length}종목 (KR ${syms.filter(s=>s.endsWith(".kr")).length} · US ${syms.filter(s=>s.endsWith(".us")).length})`);
+console.log(`유니버스: ${syms.length}종목 (KR ${syms.filter(s=>s.endsWith(".kr")).length} · US ${syms.filter(s=>s.endsWith(".us")).length} · JP ${syms.filter(s=>s.endsWith(".jp")).length})`);
 
 // 2) 데이터 수집
 let data={}, src={};
 if(SELFTEST){
   let i=0; for(const s of syms){ data[s]=synth([0.0016,0.0009,0.0004,-0.001][i%4],12,7+i*13); src[s]="Synthetic"; i++; }
-  data["^kospi"]=synth(0.0012,12,3); data["^spx"]=synth(0.0014,12,5);
+  data["^kospi"]=synth(0.0012,12,3); data["^spx"]=synth(-0.0006,12,5); data["^nkx"]=synth(0.0011,12,9);
 }else{
-  console.log("지수 수집…"); const idx=await fetchMany(["^kospi","^spx"],"지수"); Object.assign(data,idx.out);
+  console.log("지수 수집…"); const idx=await fetchMany(["^kospi","^spx","^nkx"],"지수"); Object.assign(data,idx.out);
   console.log("종목 수집 시작…"); const r=await fetchMany(syms,"종목"); Object.assign(data,r.out); src=r.src;
 }
 
 // 3) 분석
 const analyzed = syms.map(s=>analyzeStock(s,UNIV[s],data[s])).filter(Boolean);
 // 4) RS 백분위(국가별)
-for(const ctry of ["kr","us"]){ const g=analyzed.filter(a=>a.country===ctry && isFinite(a.rsRaw)).sort((a,b)=>a.rsRaw-b.rsRaw);
+for(const ctry of ["kr","us","jp"]){ const g=analyzed.filter(a=>a.country===ctry && isFinite(a.rsRaw)).sort((a,b)=>a.rsRaw-b.rsRaw);
   g.forEach((a,i)=>a.rs=g.length>1?Math.round(1+i/(g.length-1)*98):50); }
 
-// 5) 시장 breadth + 레짐
+// 5) 시장 breadth + 레짐 + 지수 스파크라인
 function breadth(ctry){ const g=analyzed.filter(a=>a.country===ctry); const n=g.length||1;
   return { count:g.length, above200:g.filter(a=>a.above200).length/n, above50:g.filter(a=>a.above50).length/n,
     newHigh:g.filter(a=>a.newHigh).length, newLow:g.filter(a=>a.newLow).length }; }
-const market = { kr:{...regime(data["^kospi"]), ...breadth("kr")}, us:{...regime(data["^spx"]), ...breadth("us")} };
+function spark(idx){ const d=data[idx]; if(!d||!d.length)return []; return d.slice(-20).map(x=>Math.round(x.c*100)/100); }
+const market = {
+  us:{...regime(data["^spx"]),   ...breadth("us"), spark:spark("^spx")},
+  kr:{...regime(data["^kospi"]), ...breadth("kr"), spark:spark("^kospi")},
+  jp:{...regime(data["^nkx"]),   ...breadth("jp"), spark:spark("^nkx")}
+};
 
 // 6) 섹터 강도(국가별)
 const sectors=[];
-for(const ctry of ["kr","us"]){ const g=analyzed.filter(a=>a.country===ctry);
+for(const ctry of ["kr","us","jp"]){ const g=analyzed.filter(a=>a.country===ctry);
   const by={}; for(const a of g){ (by[a.sector]=by[a.sector]||[]).push(a); }
   for(const name in by){ const arr=by[name]; if(arr.length<3)continue;
     const avgRS=Math.round(arr.reduce((s,a)=>s+a.rs,0)/arr.length);
@@ -261,8 +280,10 @@ const season = syms.map(s=>seasonal(s,UNIV[s],data[s])).filter(Boolean).sort((a,
 // 9) 출력 — 신호 있는 종목만(시장폭·섹터는 위에서 전체로 계산 완료) → 파일 경량화
 const trend = analyzed.filter(a=>a.sigs.length).map(a=>({sym:a.sym,name:a.name,sector:a.sector,asset:a.asset,country:a.country,
   price:a.price,rs:a.rs,longOK:a.longOK,above200:a.above200,closes:a.closes,sigs:a.sigs}));
+// 히트맵용 — 분석된 전체 종목 경량 목록
+const stocks = analyzed.map(a=>({sym:a.sym,name:a.name,sector:a.sector,country:a.country,rs:a.rs,above200:a.above200,sig:a.sigs.length>0}));
 const out = { signdate, builtAt:new Date().toISOString(), coverage:{universe:syms.length,analyzed:analyzed.length},
-  market, sectors, sources:src, trend, season };
+  market, sectors, stocks, sources:src, trend, season };
 writeFileSync(new URL("../data.json", import.meta.url), JSON.stringify(out));
 console.log(`\n✅ data.json · 분석 ${analyzed.length}/${syms.length} · 섹터 ${sectors.length} · 계절성 ${season.length} · 기준일 ${signdate}`);
 console.log(`   KOSPI ${market.kr.ok?"상승장":"약세"} (200일선위 ${(market.kr.above200*100).toFixed(0)}%) · S&P500 ${market.us.ok?"상승장":"약세"} (200일선위 ${(market.us.above200*100).toFixed(0)}%)`);
