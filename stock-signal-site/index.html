@@ -71,6 +71,25 @@
   .toast{position:fixed;bottom:84px;left:50%;transform:translateX(-50%);background:#1d2533;color:#fff;padding:9px 16px;border-radius:999px;font-size:12px;opacity:0;transition:opacity .25s;z-index:50;pointer-events:none}
   .toast.show{opacity:.95}
   .disclaimer{font-size:11px;color:var(--muted);line-height:1.7;margin:18px 2px 4px}
+  /* 시장/섹터 */
+  .mgrid{display:grid;grid-template-columns:1fr;gap:12px}
+  @media(min-width:680px){.mgrid{grid-template-columns:1fr 1fr}}
+  .mcard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .mhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .mhead .t{font-weight:800;font-size:15px}
+  .light{font-size:12px;font-weight:800;padding:4px 11px;border-radius:999px}
+  .light.up{background:var(--greenbg);color:var(--green)} .light.down{background:#fdecec;color:var(--red)} .light.mid{background:var(--amberbg);color:#c2710c}
+  .brow{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;margin-top:9px}
+  .gbar{height:9px;background:#eef1f6;border-radius:999px;overflow:hidden;margin:4px 0 2px}
+  .gbar>i{display:block;height:100%;border-radius:999px}
+  .subhead{font-weight:800;font-size:13px;margin:18px 2px 4px;color:#55617a}
+  .secrow{display:flex;align-items:center;gap:10px;padding:8px 4px;cursor:pointer;border-bottom:1px solid #f2f4f8;border-radius:8px}
+  .secrow:hover{background:#fafbfd}
+  .secrow .snm{width:84px;font-size:13px;font-weight:700;flex:0 0 auto}
+  .secrow .sbarwrap{flex:1;height:14px;background:#eef1f6;border-radius:999px;overflow:hidden}
+  .secrow .sbar{height:100%;border-radius:999px}
+  .secrow .sval{flex:0 0 auto;width:118px;text-align:right;font-size:11px;color:var(--muted)}
+  #sectorChip b{color:var(--blue)} #sectorChip .x{cursor:pointer;color:var(--muted);margin-left:4px}
 </style>
 </head>
 <body>
@@ -78,10 +97,10 @@
   <div class="topbar"><h1>📊 매수 시그널</h1><span class="menu">☰</span></div>
   <div class="body">
     <h2 class="sec">매수</h2>
-    <div class="tabs"><div class="tab on" data-cat="trend">추세추종</div><div class="tab" data-cat="season">계절성</div></div>
+    <div class="tabs"><div class="tab on" data-cat="market">시장</div><div class="tab" data-cat="trend">추세추종</div><div class="tab" data-cat="season">계절성</div></div>
     <div class="banner" id="banner"><span class="dot"></span><span id="bannerTxt">불러오는 중…</span></div>
 
-    <div id="trendFilters">
+    <div id="trendFilters" style="display:none">
       <div class="filters">
         <div class="frow"><span class="flabel">국가</span>
           <span class="pill on" data-g="country" data-v="all">전체</span>
@@ -109,6 +128,7 @@
         <span class="updated" id="updTrend"></span>
         <button class="refresh" id="refTrend" title="최신 불러오기">🔄 새로고침</button>
       </div>
+      <div id="sectorChip" style="display:none;margin:2px 0 6px;font-size:13px"></div>
     </div>
 
     <div id="seasonFilters" style="display:none">
@@ -142,8 +162,8 @@
 <script>
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 const HP=[2,3,5,10,20,60,126,252];
-const F={country:"all",asset:"all",signal:"all",rs:"70",zone:"in",scountry:"all",swin:"90"};
-let SORT="ev", CAT="trend";
+const F={country:"all",asset:"all",signal:"all",rs:"70",zone:"in",sector:"all",scountry:"all",swin:"90"};
+let SORT="ev", CAT="market";
 let DATA=null, TREND=[], SEASON=[], MARKET={kr:null,us:null}, SIGNDATE="", SOURCES={};
 const curOf=s=>s.endsWith(".kr")?"₩":"$";
 const countryOf=s=>s.endsWith(".kr")?"kr":"us";
@@ -170,7 +190,46 @@ async function load(showSpin){
   setStatus(`${TREND.length}종목 집계${srcTxt?" ("+srcTxt+")":""}`);
   const upd="업데이트 "+hmOf(DATA.builtAt);
   $("#updTrend").textContent=upd; $("#updSeason").textContent=upd;
-  if(CAT==="trend")renderTrend(); else renderSeason();
+  if(CAT==="market")renderMarket(); else if(CAT==="trend")renderTrend(); else renderSeason();
+}
+//============ 시장 · 섹터 렌더 ============
+function regimeLight(r){ if(!r||!r.have)return ["mid","데이터 부족"]; return r.ok?["up","상승장"]:["down","약세장"]; }
+function marketCard(title,r){
+  const [cls,txt]=regimeLight(r);
+  const a200=(r&&r.above200?r.above200*100:0), a50=(r&&r.above50?r.above50*100:0);
+  const c200=a200>=60?'#16a34a':a200>=40?'#f59e0b':'#ef4444';
+  return `<div class="mcard"><div class="mhead"><span class="t">${title}</span><span class="light ${cls}">${txt}</span></div>
+    <div class="brow"><span>200일선 위 종목</span><span><b style="color:${c200}">${a200.toFixed(0)}%</b></span></div>
+    <div class="gbar"><i style="width:${a200}%;background:${c200}"></i></div>
+    <div class="brow"><span>50일선 위 종목</span><span>${a50.toFixed(0)}%</span></div>
+    <div class="gbar"><i style="width:${a50}%;background:#9bb4ff"></i></div>
+    <div class="brow"><span>신고가 <b class="pos">${(r&&r.newHigh)||0}</b> · 신저가 <b class="neg">${(r&&r.newLow)||0}</b></span><span>${(r&&r.count)||0}종목 분석</span></div></div>`;
+}
+function renderMarket(){
+  $("#bannerTxt").textContent=`시장·섹터 기준일 ${SIGNDATE} · 시장 → 섹터 → 종목 순으로 보세요`;
+  const box=$("#results"); box.innerHTML=""; $("#count").style.display="none";
+  const mg=document.createElement("div"); mg.className="mgrid";
+  mg.innerHTML=marketCard("🇰🇷 한국 (KOSPI)",MARKET.kr)+marketCard("🇺🇸 미국 (S&P500)",MARKET.us);
+  box.appendChild(mg);
+  for(const [ctry,label] of [["kr","🇰🇷 한국 섹터 강도 (클릭 → 강한 종목)"],["us","🇺🇸 미국 섹터 강도 (클릭 → 강한 종목)"]]){
+    const list=(DATA.sectors||[]).filter(s=>s.country===ctry).sort((a,b)=>b.avgRS-a.avgRS);
+    if(!list.length)continue;
+    const h=document.createElement("div"); h.className="subhead"; h.textContent=label; box.appendChild(h);
+    list.forEach(s=>{ const row=document.createElement("div"); row.className="secrow";
+      const col=s.avgRS>=60?'#16a34a':s.avgRS>=40?'#f59e0b':'#ef4444';
+      row.innerHTML=`<span class="snm">${s.name}</span><span class="sbarwrap"><span class="sbar" style="width:${s.avgRS}%;background:${col}"></span></span>
+        <span class="sval">RS ${s.avgRS} · 200%↑ ${(s.pctAbove200*100).toFixed(0)} · ${s.count}종</span>`;
+      row.addEventListener("click",()=>drillSector(ctry,s.name)); box.appendChild(row); });
+  }
+}
+function drillSector(ctry,sector){
+  F.country=ctry; F.sector=sector; F.rs="0"; F.zone="near";
+  $$('.pill[data-g="country"]').forEach(x=>x.classList.toggle("on",x.dataset.v===ctry));
+  $$('.pill[data-g="rs"]').forEach(x=>x.classList.toggle("on",x.dataset.v==="0"));
+  $$('.pill[data-g="zone"]').forEach(x=>x.classList.toggle("on",x.dataset.v==="near"));
+  $$(".tab").forEach(x=>x.classList.remove("on")); document.querySelector('.tab[data-cat="trend"]').classList.add("on");
+  CAT="trend"; $("#trendFilters").style.display="block"; $("#seasonFilters").style.display="none";
+  renderTrend();
 }
 function renderEmpty(){
   $("#bannerTxt").textContent="데이터 준비 전";
@@ -183,9 +242,14 @@ function renderEmpty(){
 function passMarket(sym){const r=MARKET[countryOf(sym)];return r&&r.have?r.ok:true;}
 function renderTrend(){
   $("#bannerTxt").textContent=`신호 기준일 ${SIGNDATE} · 장 전 지표(매일 아침 자동 갱신)`;
+  const chip=$("#sectorChip");
+  if(F.sector!=="all"){ chip.style.display="block"; chip.innerHTML=`섹터: <b>${F.sector}</b><span class="x">✕ 전체 보기</span>`;
+    chip.querySelector(".x").onclick=()=>{F.sector="all";chip.style.display="none";renderTrend();}; }
+  else chip.style.display="none";
   let cands=[];
   for(const a of TREND){
     if(F.country!=="all" && (a.country||countryOf(a.sym))!==F.country)continue;
+    if(F.sector!=="all" && a.sector!==F.sector)continue;
     if(!passMarket(a.sym))continue;
     if(F.rs!=="0" && a.rs<Number(F.rs))continue;
     for(const s of (a.sigs||[])){
@@ -306,7 +370,7 @@ $$(".tab").forEach(t=>t.addEventListener("click",()=>{
   $("#trendFilters").style.display=CAT==="trend"?"block":"none";
   $("#seasonFilters").style.display=CAT==="season"?"block":"none";
   if(!DATA){renderEmpty();return;}
-  if(CAT==="trend")renderTrend(); else renderSeason();
+  if(CAT==="market")renderMarket(); else if(CAT==="trend")renderTrend(); else renderSeason();
 }));
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden)load(false); });
 load(true);
